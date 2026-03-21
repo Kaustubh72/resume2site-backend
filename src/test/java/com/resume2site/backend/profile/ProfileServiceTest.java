@@ -3,6 +3,7 @@ package com.resume2site.backend.profile;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -11,8 +12,12 @@ import com.resume2site.backend.common.exception.UnauthorizedException;
 import com.resume2site.backend.profile.domain.Profile;
 import com.resume2site.backend.profile.domain.ProfileSection;
 import com.resume2site.backend.profile.dto.ProfileDetailResponse;
+import com.resume2site.backend.profile.dto.PublishProfileRequest;
+import com.resume2site.backend.profile.dto.PublishProfileResponse;
+import com.resume2site.backend.profile.dto.SlugAvailabilityResponse;
 import com.resume2site.backend.profile.dto.UpdateProfileRequest;
 import com.resume2site.backend.profile.dto.UpdateProfileSectionsRequest;
+import com.resume2site.backend.profile.dto.UpdateProfileSlugRequest;
 import com.resume2site.backend.profile.repository.ProfileEducationRepository;
 import com.resume2site.backend.profile.repository.ProfileExperienceRepository;
 import com.resume2site.backend.profile.repository.ProfileLinkRepository;
@@ -24,6 +29,7 @@ import com.resume2site.backend.security.jwt.AuthenticatedUser;
 import com.resume2site.backend.template.domain.Template;
 import com.resume2site.backend.template.repository.TemplateRepository;
 import com.resume2site.backend.user.domain.User;
+import com.resume2site.backend.user.repository.UserRepository;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -44,6 +50,8 @@ class ProfileServiceTest {
     @Mock private ProfileExperienceRepository profileExperienceRepository;
     @Mock private ProfileEducationRepository profileEducationRepository;
     @Mock private ProfileProjectRepository profileProjectRepository;
+    @Mock private UserRepository userRepository;
+    @Mock private SlugService slugService;
 
     @InjectMocks private ProfileService profileService;
 
@@ -129,6 +137,73 @@ class ProfileServiceTest {
         assertThatThrownBy(() -> profileService.updateSections(10L, request, "draft-token", null))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessage("Duplicate sortOrder is not allowed: 0");
+    }
+
+    @Test
+    void publishAttachesAnonymousProfileToAuthenticatedUserAndReturnsPublicUrl() {
+        AuthenticatedUser authenticatedUser = new AuthenticatedUser(42L, "owner@example.com");
+        Template template = new Template();
+        template.setId(3L);
+        anonymousProfile.setTemplate(template);
+
+        User user = new User();
+        user.setId(42L);
+
+        when(profileRepository.findById(10L)).thenReturn(Optional.of(anonymousProfile));
+        when(userRepository.findById(42L)).thenReturn(Optional.of(user));
+        when(slugService.requireUsableSlug("john-dev", 10L)).thenReturn("john-dev");
+        when(profileRepository.save(anonymousProfile)).thenReturn(anonymousProfile);
+
+        PublishProfileResponse response = profileService.publishProfile(10L, new PublishProfileRequest("john-dev"), "draft-token", authenticatedUser);
+
+        assertThat(anonymousProfile.getUser()).isEqualTo(user);
+        assertThat(anonymousProfile.getSlug()).isEqualTo("john-dev");
+        assertThat(anonymousProfile.getPublicationStatus()).isEqualTo("PUBLISHED");
+        assertThat(response.publicUrl()).isEqualTo("/u/john-dev");
+    }
+
+    @Test
+    void publishRequiresTemplateBeforePublishing() {
+        AuthenticatedUser authenticatedUser = new AuthenticatedUser(42L, "owner@example.com");
+        User owner = new User();
+        owner.setId(42L);
+        anonymousProfile.setUser(owner);
+
+        when(profileRepository.findById(10L)).thenReturn(Optional.of(anonymousProfile));
+
+        assertThatThrownBy(() -> profileService.publishProfile(10L, new PublishProfileRequest("john-dev"), null, authenticatedUser))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessage("templateId is required before publishing");
+
+        verify(slugService, never()).requireUsableSlug(any(), any());
+    }
+
+    @Test
+    void updateSlugRequiresPublishedProfile() {
+        AuthenticatedUser authenticatedUser = new AuthenticatedUser(42L, "owner@example.com");
+        User owner = new User();
+        owner.setId(42L);
+        anonymousProfile.setUser(owner);
+
+        when(profileRepository.findById(10L)).thenReturn(Optional.of(anonymousProfile));
+
+        assertThatThrownBy(() -> profileService.updateSlug(10L, new UpdateProfileSlugRequest("john-dev"), authenticatedUser))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessage("Profile must be published before updating slug");
+    }
+
+    @Test
+    void slugAvailabilityReturnsSuggestionsWhenTaken() {
+        SlugService service = new SlugService(profileRepository);
+        when(profileRepository.existsBySlugIgnoreCase("john-dev")).thenReturn(true);
+        when(profileRepository.existsBySlugIgnoreCase("john-dev-site")).thenReturn(false);
+        when(profileRepository.existsBySlugIgnoreCase("john-dev-portfolio")).thenReturn(false);
+
+        SlugAvailabilityResponse response = service.checkAvailability("john-dev");
+
+        assertThat(response.valid()).isTrue();
+        assertThat(response.available()).isFalse();
+        assertThat(response.suggestions()).contains("john-dev-site", "john-dev-portfolio");
     }
 
     private ProfileSection section(String key, String displayName, int sortOrder) {

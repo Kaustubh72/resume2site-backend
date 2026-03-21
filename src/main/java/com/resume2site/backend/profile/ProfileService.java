@@ -15,12 +15,15 @@ import com.resume2site.backend.profile.repository.*;
 import com.resume2site.backend.security.jwt.AuthenticatedUser;
 import com.resume2site.backend.template.domain.Template;
 import com.resume2site.backend.template.repository.TemplateRepository;
+import com.resume2site.backend.user.domain.User;
+import com.resume2site.backend.user.repository.UserRepository;
 import jakarta.transaction.Transactional;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.time.Instant;
 import java.util.Objects;
 import org.springframework.stereotype.Service;
 
@@ -37,6 +40,10 @@ public class ProfileService {
     );
 
     private final ProfileRepository profileRepository;
+    private static final String STATUS_DRAFT = "DRAFT";
+    private static final String STATUS_PUBLISHED = "PUBLISHED";
+    private static final String PUBLIC_PROFILE_PATH_PREFIX = "/u/";
+
     private final TemplateRepository templateRepository;
     private final ProfileSectionRepository profileSectionRepository;
     private final ProfileLinkRepository profileLinkRepository;
@@ -44,6 +51,8 @@ public class ProfileService {
     private final ProfileExperienceRepository profileExperienceRepository;
     private final ProfileEducationRepository profileEducationRepository;
     private final ProfileProjectRepository profileProjectRepository;
+    private final UserRepository userRepository;
+    private final SlugService slugService;
 
     public ProfileService(ProfileRepository profileRepository,
                           TemplateRepository templateRepository,
@@ -52,7 +61,9 @@ public class ProfileService {
                           ProfileSkillRepository profileSkillRepository,
                           ProfileExperienceRepository profileExperienceRepository,
                           ProfileEducationRepository profileEducationRepository,
-                          ProfileProjectRepository profileProjectRepository) {
+                          ProfileProjectRepository profileProjectRepository,
+                          UserRepository userRepository,
+                          SlugService slugService) {
         this.profileRepository = profileRepository;
         this.templateRepository = templateRepository;
         this.profileSectionRepository = profileSectionRepository;
@@ -61,6 +72,8 @@ public class ProfileService {
         this.profileExperienceRepository = profileExperienceRepository;
         this.profileEducationRepository = profileEducationRepository;
         this.profileProjectRepository = profileProjectRepository;
+        this.userRepository = userRepository;
+        this.slugService = slugService;
     }
 
     @Transactional
@@ -247,6 +260,40 @@ public class ProfileService {
     }
 
     @Transactional
+    public PublishProfileResponse publishProfile(Long profileId,
+                                                 PublishProfileRequest request,
+                                                 String draftToken,
+                                                 AuthenticatedUser authenticatedUser) {
+        Profile profile = requireAuthenticatedOwnedProfile(profileId, draftToken, authenticatedUser);
+        attachProfileToAuthenticatedUser(profile, authenticatedUser);
+        return publish(profile, request.slug());
+    }
+
+    @Transactional
+    public PublishProfileResponse republishProfile(Long profileId,
+                                                   PublishProfileRequest request,
+                                                   String draftToken,
+                                                   AuthenticatedUser authenticatedUser) {
+        Profile profile = requireAuthenticatedOwnedProfile(profileId, draftToken, authenticatedUser);
+        return publish(profile, request.slug());
+    }
+
+    @Transactional
+    public PublishProfileResponse updateSlug(Long profileId,
+                                             UpdateProfileSlugRequest request,
+                                             AuthenticatedUser authenticatedUser) {
+        Profile profile = requireAuthenticatedOwnedProfile(profileId, null, authenticatedUser);
+        if (!STATUS_PUBLISHED.equalsIgnoreCase(profile.getPublicationStatus())) {
+            throw new BadRequestException("Profile must be published before updating slug");
+        }
+
+        String slug = slugService.requireUsableSlug(request.slug(), profile.getId());
+        profile.setSlug(slug);
+        Profile savedProfile = profileRepository.save(profile);
+        return toPublishResponse(savedProfile);
+    }
+
+    @Transactional
     public void ensureDefaultSections(Profile profile) {
         List<ProfileSection> existing = profileSectionRepository.findAllByProfileIdOrderBySortOrderAsc(profile.getId());
         if (!existing.isEmpty()) {
@@ -263,6 +310,45 @@ public class ProfileService {
             sections.add(section);
         }
         profileSectionRepository.saveAll(sections);
+    }
+
+    private PublishProfileResponse publish(Profile profile, String requestedSlug) {
+        if (profile.getTemplate() == null) {
+            throw new BadRequestException("templateId is required before publishing");
+        }
+
+        String slug = slugService.requireUsableSlug(requestedSlug, profile.getId());
+        profile.setSlug(slug);
+        profile.setPublicationStatus(STATUS_PUBLISHED);
+        profile.setPublishedAt(Instant.now());
+        Profile savedProfile = profileRepository.save(profile);
+        return toPublishResponse(savedProfile);
+    }
+
+    private Profile requireAuthenticatedOwnedProfile(Long profileId, String draftToken, AuthenticatedUser authenticatedUser) {
+        if (authenticatedUser == null) {
+            throw new UnauthorizedException("Authentication is required to publish this profile");
+        }
+        return loadAuthorizedProfile(profileId, draftToken, authenticatedUser);
+    }
+
+    private void attachProfileToAuthenticatedUser(Profile profile, AuthenticatedUser authenticatedUser) {
+        if (profile.getUser() != null) {
+            return;
+        }
+        User user = userRepository.findById(authenticatedUser.userId())
+                .orElseThrow(() -> new UnauthorizedException("Authenticated user not found"));
+        profile.setUser(user);
+    }
+
+    private PublishProfileResponse toPublishResponse(Profile profile) {
+        return new PublishProfileResponse(
+                profile.getId(),
+                profile.getSlug(),
+                profile.getPublicationStatus(),
+                profile.getTemplate() != null ? profile.getTemplate().getId() : null,
+                PUBLIC_PROFILE_PATH_PREFIX + profile.getSlug()
+        );
     }
 
     private void applyLink(ProfileLink link, UpsertProfileLinkRequest request) {
