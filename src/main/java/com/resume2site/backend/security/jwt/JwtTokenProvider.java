@@ -6,7 +6,7 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import java.nio.charset.StandardCharsets;
-import java.security.Key;
+import javax.crypto.SecretKey;
 import java.util.Collections;
 import java.util.Date;
 import java.util.Optional;
@@ -19,14 +19,14 @@ import org.springframework.stereotype.Component;
 public class JwtTokenProvider {
 
     private final JwtProperties properties;
-    private final Key signingKey;
+    private final SecretKey signingKey;
 
     public JwtTokenProvider(JwtProperties properties) {
         this.properties = properties;
         byte[] keyBytes;
         try {
             keyBytes = Decoders.BASE64.decode(properties.secret());
-        } catch (IllegalArgumentException exception) {
+        } catch (Exception exception) {
             keyBytes = properties.secret().getBytes(StandardCharsets.UTF_8);
         }
         this.signingKey = Keys.hmacShaKeyFor(keyBytes);
@@ -49,7 +49,7 @@ public class JwtTokenProvider {
 
     public Optional<Authentication> parseAuthentication(String token) {
         try {
-            Claims claims = Jwts.parser().verifyWith((javax.crypto.SecretKey) signingKey).build()
+            Claims claims = Jwts.parser().verifyWith(signingKey).build()
                     .parseSignedClaims(token)
                     .getPayload();
 

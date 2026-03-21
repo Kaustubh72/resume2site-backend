@@ -1,5 +1,9 @@
 # Resume2Site Backend
 
+Spring Boot backend for the Resume2Site MVP, a resume-first platform that converts uploaded resumes into editable portfolio profiles and publishes them under path-based public URLs.
+
+## What is included right now
+=======
 Spring Boot backend foundation for the Resume2Site MVP, a resume-first platform that converts uploaded resumes into editable portfolio profiles and publishes them under path-based public URLs.
 
 ## What is included in this foundation
@@ -7,6 +11,8 @@ Spring Boot backend foundation for the Resume2Site MVP, a resume-first platform 
 - Feature-oriented package structure for auth, resume, profile, template, common, config, and security.
 - PostgreSQL + JPA + Flyway setup from day one.
 - Initial MVP schema for users, resume uploads, profiles, nested profile sections, and templates.
+- MVP auth module with email/password signup, login, `/me`, BCrypt password hashing, and JWT-based stateless security.
+=======
 - JWT security skeleton with public/private route separation.
 - CORS, multipart upload limits, actuator health, and consistent API error handling.
 - Seed data for the 3 default portfolio templates.
@@ -62,6 +68,63 @@ curl http://localhost:8080/api/health
 curl http://localhost:8080/actuator/health
 ```
 
+## Current API surface
+- `GET /api/health`
+- `POST /api/auth/signup`
+- `POST /api/auth/login`
+- `GET /api/auth/me`
+- `GET /api/templates`
+- `GET /api/resumes/foundation-status`
+- `GET /api/profiles/foundation-status`
+
+## Auth API examples
+
+### Signup
+```bash
+curl -X POST http://localhost:8080/api/auth/signup \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "email": "alice@example.com",
+    "password": "password123",
+    "fullName": "Alice Johnson"
+  }'
+```
+
+### Login
+```bash
+curl -X POST http://localhost:8080/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "email": "alice@example.com",
+    "password": "password123"
+  }'
+```
+
+### Me
+```bash
+curl http://localhost:8080/api/auth/me \
+  -H 'Authorization: Bearer <access-token>'
+```
+
+## Security behavior
+- `POST /api/auth/signup` and `POST /api/auth/login` are public.
+- `GET /api/auth/me` requires a valid JWT bearer token.
+- Template listing, resume upload/parsing endpoints, slug checks, and public profile fetches remain public for the MVP flow.
+- Other future ownership-sensitive endpoints are protected by default unless explicitly opened.
+
+## MVP assumptions in the current codebase
+- Profiles are dynamically rendered by the frontend from structured API data.
+- Anonymous draft support will be handled through `draft_token` in later steps.
+- Resume uploads are modeled now, but storage and parsing pipeline are intentionally deferred.
+- Publish/login flow will later attach anonymous drafts to authenticated users.
+
+## Recommended next step
+Implement the **resume upload + parsing pipeline** next:
+- anonymous resume upload
+- PDF/DOCX validation
+- extraction with Apache Tika
+- best-effort structured draft profile creation
+- draft token based anonymous preview/edit support
 ## Current API surface in foundation
 - `GET /api/health`
 - `GET /api/templates`
