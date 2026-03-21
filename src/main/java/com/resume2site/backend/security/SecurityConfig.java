@@ -30,6 +30,10 @@ public class SecurityConfig {
             "/api/public/**",
             "/api/resumes/**",
             "/api/slugs/**",
+            "/swagger-ui.html",
+            "/swagger-ui/**",
+            "/api-docs",
+            "/api-docs/**",
             "/error"
     };
 

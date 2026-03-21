@@ -26,7 +26,7 @@ public class JwtTokenProvider {
         byte[] keyBytes;
         try {
             keyBytes = Decoders.BASE64.decode(properties.secret());
-        } catch (IllegalArgumentException exception) {
+        } catch (Exception exception) {
             keyBytes = properties.secret().getBytes(StandardCharsets.UTF_8);
         }
         this.signingKey = Keys.hmacShaKeyFor(keyBytes);
