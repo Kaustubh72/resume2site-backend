@@ -3,11 +3,17 @@
 Spring Boot backend for the Resume2Site MVP, a resume-first platform that converts uploaded resumes into editable portfolio profiles and publishes them under path-based public URLs.
 
 ## What is included right now
+=======
+Spring Boot backend foundation for the Resume2Site MVP, a resume-first platform that converts uploaded resumes into editable portfolio profiles and publishes them under path-based public URLs.
+
+## What is included in this foundation
 - Spring Boot 3.3.x project with Java 21 and Maven.
 - Feature-oriented package structure for auth, resume, profile, template, common, config, and security.
 - PostgreSQL + JPA + Flyway setup from day one.
 - Initial MVP schema for users, resume uploads, profiles, nested profile sections, and templates.
 - MVP auth module with email/password signup, login, `/me`, BCrypt password hashing, and JWT-based stateless security.
+=======
+- JWT security skeleton with public/private route separation.
 - CORS, multipart upload limits, actuator health, and consistent API error handling.
 - Seed data for the 3 default portfolio templates.
 
@@ -46,6 +52,12 @@ export APP_CORS_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173
 ```
 
 ### 3. Run the application
+```bash
+./mvnw spring-boot:run
+```
+
+If Maven Wrapper is not present, use:
+
 ```bash
 mvn spring-boot:run
 ```
@@ -113,3 +125,31 @@ Implement the **resume upload + parsing pipeline** next:
 - extraction with Apache Tika
 - best-effort structured draft profile creation
 - draft token based anonymous preview/edit support
+## Current API surface in foundation
+- `GET /api/health`
+- `GET /api/templates`
+- `GET /api/auth/foundation-status`
+- `GET /api/resumes/foundation-status`
+- `GET /api/profiles/foundation-status`
+
+These placeholder endpoints exist only to prove wiring and should be replaced with real feature flows in upcoming steps.
+
+## MVP assumptions in this foundation
+- Profiles are dynamically rendered by the frontend from structured API data.
+- Anonymous draft support will be handled through `draft_token` in later steps.
+- Resume uploads are modeled now, but storage and parsing pipeline are intentionally deferred.
+- Publish/login flow will attach anonymous drafts to authenticated users later.
+
+## Recommended next step
+Implement the **Auth module** next:
+- signup
+- login
+- me
+- password hashing
+- JWT issuance and authenticated user context
+
+After auth, continue with:
+1. Resume upload + parsing pipeline
+2. Profile CRUD
+3. Slug + publish flow
+4. Public profile APIs
