@@ -68,6 +68,8 @@ curl http://localhost:8081/actuator/health
 - `POST /api/auth/login`
 - `GET /api/auth/me`
 - `GET /api/templates`
+- `GET /api/templates/{templateId}`
+- `GET /api/public/{slug}`
 - `POST /api/resumes/upload`
 - `POST /api/resumes/{resumeUploadId}/parse`
 
@@ -151,6 +153,70 @@ curl -X POST http://localhost:8081/api/auth/login \
 ```bash
 curl http://localhost:8081/api/auth/me \
   -H 'Authorization: Bearer <access-token>'
+```
+
+
+## Public rendering flow
+The published portfolio flow for the MVP stays fully API-driven and frontend-rendered:
+1. Frontend fetches active templates from `GET /api/templates` and optionally `GET /api/templates/{templateId}` to show template cards before publish.
+2. Resume parsing and profile editing continue to produce one shared structured profile schema regardless of template choice.
+3. When a user publishes, the backend stores the chosen `templateId`, slug, and marks the profile as `PUBLISHED`.
+4. Public portfolio pages resolve by path-based slug routing such as `/u/{slug}` on the frontend app.
+5. The frontend calls `GET /api/public/{slug}` and receives only public-safe, published profile data plus the selected template metadata.
+6. The frontend selects the matching template component and renders the shared profile data dynamically. No HTML is rendered on the backend and no static site generation is used in the MVP.
+
+### Template response shape
+`GET /api/templates` returns only active templates intended for the picker UI, including lightweight metadata useful for previews.
+
+Example:
+```json
+{
+  "data": [
+    {
+      "id": 1,
+      "code": "minimal-dev",
+      "name": "Minimal Developer",
+      "description": "Clean single-column template focused on early-career developers.",
+      "previewImageUrl": "https://cdn.resume2site.dev/templates/minimal-dev.png",
+      "category": "developer",
+      "accentColor": "#111827",
+      "features": ["Single-column layout", "Strong summary section", "Readable project blocks"],
+      "sortOrder": 1
+    }
+  ]
+}
+```
+
+### Public profile response shape
+`GET /api/public/{slug}` only returns published, renderable data. Internal fields such as draft tokens, ownership information, resume upload references, and publication workflow details are intentionally excluded.
+
+Example:
+```json
+{
+  "data": {
+    "slug": "alice-johnson",
+    "publishedAt": "2026-03-21T10:15:30Z",
+    "template": {
+      "id": 2,
+      "code": "modern-stack",
+      "name": "Modern Stack"
+    },
+    "profile": {
+      "fullName": "Alice Johnson",
+      "headline": "Software Engineer",
+      "summary": "Backend-focused developer...",
+      "email": "alice@example.com",
+      "phone": "+1-555-0100",
+      "location": "Bengaluru, India",
+      "sections": [],
+      "links": [],
+      "skills": [],
+      "experiences": [],
+      "education": [],
+      "projects": []
+    }
+  }
+}
 ```
 
 ## Security behavior

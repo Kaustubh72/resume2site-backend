@@ -2,12 +2,12 @@ package com.resume2site.backend.template;
 
 import com.resume2site.backend.common.api.ApiResponse;
 import com.resume2site.backend.template.dto.TemplateResponse;
-import com.resume2site.backend.template.repository.TemplateRepository;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -16,10 +16,10 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(name = "Templates", description = "Template management operations")
 public class TemplateController {
 
-    private final TemplateRepository templateRepository;
+    private final TemplateService templateService;
 
-    public TemplateController(TemplateRepository templateRepository) {
-        this.templateRepository = templateRepository;
+    public TemplateController(TemplateService templateService) {
+        this.templateService = templateService;
     }
 
     @Operation(summary = "List all active templates")
@@ -29,17 +29,12 @@ public class TemplateController {
     })
     @GetMapping
     public ApiResponse<List<TemplateResponse>> listTemplates() {
-        List<TemplateResponse> templates = templateRepository.findAllByActiveTrueOrderBySortOrderAsc()
-                .stream()
-                .map(template -> new TemplateResponse(
-                        template.getId(),
-                        template.getCode(),
-                        template.getName(),
-                        template.getDescription(),
-                        template.getPreviewImageUrl(),
-                        template.getSortOrder()
-                ))
-                .toList();
-        return new ApiResponse<>(templates);
+        return new ApiResponse<>(templateService.listActiveTemplates());
+    }
+
+    @Operation(summary = "Get one active template by id")
+    @GetMapping("/{templateId}")
+    public ApiResponse<TemplateResponse> getTemplate(@PathVariable Long templateId) {
+        return new ApiResponse<>(templateService.getActiveTemplate(templateId));
     }
 }

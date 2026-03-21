@@ -17,7 +17,6 @@ import com.resume2site.backend.template.domain.Template;
 import com.resume2site.backend.template.repository.TemplateRepository;
 import com.resume2site.backend.user.domain.User;
 import com.resume2site.backend.user.repository.UserRepository;
-import jakarta.transaction.Transactional;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -25,6 +24,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.time.Instant;
 import java.util.Objects;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -74,6 +74,54 @@ public class ProfileService {
         this.profileProjectRepository = profileProjectRepository;
         this.userRepository = userRepository;
         this.slugService = slugService;
+    }
+
+
+    @Transactional(readOnly = true)
+    public PublicProfileResponse getPublicProfile(String slug) {
+        String normalizedSlug = trimToNull(slug);
+        if (normalizedSlug == null) {
+            throw new ResourceNotFoundException("Published profile not found");
+        }
+
+        Profile profile = profileRepository.findBySlugIgnoreCaseAndPublicationStatus(normalizedSlug, STATUS_PUBLISHED)
+                .orElseThrow(() -> new ResourceNotFoundException("Published profile not found"));
+
+        return new PublicProfileResponse(
+                profile.getSlug(),
+                profile.getPublishedAt(),
+                new PublicProfileResponse.PublicTemplateSelectionResponse(
+                        profile.getTemplate().getId(),
+                        profile.getTemplate().getCode(),
+                        profile.getTemplate().getName()
+                ),
+                new PublicProfileResponse.PublicProfileContentResponse(
+                        profile.getFullName(),
+                        profile.getHeadline(),
+                        profile.getProfessionalSummary(),
+                        profile.getEmail(),
+                        profile.getPhone(),
+                        profile.getLocation(),
+                        profileSectionRepository.findAllByProfileIdOrderBySortOrderAsc(profile.getId()).stream()
+                                .map(this::toSectionResponse)
+                                .toList(),
+                        profileLinkRepository.findAllByProfileIdOrderBySortOrderAsc(profile.getId()).stream()
+                                .map(this::toLinkResponse)
+                                .toList(),
+                        profileSkillRepository.findAllByProfileIdOrderBySortOrderAsc(profile.getId()).stream()
+                                .map(this::toSkillResponse)
+                                .toList(),
+                        profileExperienceRepository.findAllByProfileIdOrderBySortOrderAsc(profile.getId()).stream()
+                                .map(this::toExperienceResponse)
+                                .toList(),
+                        profileEducationRepository.findAllByProfileIdOrderBySortOrderAsc(profile.getId()).stream()
+                                .map(this::toEducationResponse)
+                                .toList(),
+                        profileProjectRepository.findAllByProfileIdOrderBySortOrderAsc(profile.getId()).stream()
+                                .map(this::toProjectResponse)
+                                .toList()
+                )
+        );
     }
 
     @Transactional
