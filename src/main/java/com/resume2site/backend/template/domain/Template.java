@@ -29,6 +29,15 @@ public class Template extends BaseEntity {
     @Column(name = "preview_image_url", length = 500)
     private String previewImageUrl;
 
+    @Column(length = 100)
+    private String category;
+
+    @Column(name = "accent_color", length = 30)
+    private String accentColor;
+
+    @Column(name = "features", columnDefinition = "TEXT")
+    private String features;
+
     @Column(nullable = false)
     private boolean active;
 

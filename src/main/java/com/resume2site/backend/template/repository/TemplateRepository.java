@@ -6,4 +6,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface TemplateRepository extends JpaRepository<Template, Long> {
     List<Template> findAllByActiveTrueOrderBySortOrderAsc();
+    java.util.Optional<Template> findByIdAndActiveTrue(Long id);
 }

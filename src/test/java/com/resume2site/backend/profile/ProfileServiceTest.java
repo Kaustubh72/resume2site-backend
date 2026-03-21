@@ -12,6 +12,7 @@ import com.resume2site.backend.common.exception.UnauthorizedException;
 import com.resume2site.backend.profile.domain.Profile;
 import com.resume2site.backend.profile.domain.ProfileSection;
 import com.resume2site.backend.profile.dto.ProfileDetailResponse;
+import com.resume2site.backend.profile.dto.PublicProfileResponse;
 import com.resume2site.backend.profile.dto.PublishProfileRequest;
 import com.resume2site.backend.profile.dto.PublishProfileResponse;
 import com.resume2site.backend.profile.dto.SlugAvailabilityResponse;
@@ -63,6 +64,43 @@ class ProfileServiceTest {
         anonymousProfile.setId(10L);
         anonymousProfile.setDraftToken("draft-token");
         anonymousProfile.setPublicationStatus("DRAFT");
+    }
+
+
+    @Test
+    void getPublicProfileReturnsOnlyPublishedProfiles() {
+        Template template = new Template();
+        template.setId(3L);
+        template.setCode("modern-stack");
+        template.setName("Modern Stack");
+        anonymousProfile.setTemplate(template);
+        anonymousProfile.setSlug("john-dev");
+        anonymousProfile.setPublicationStatus("PUBLISHED");
+
+        when(profileRepository.findBySlugIgnoreCaseAndPublicationStatus("john-dev", "PUBLISHED"))
+                .thenReturn(Optional.of(anonymousProfile));
+        when(profileSectionRepository.findAllByProfileIdOrderBySortOrderAsc(10L))
+                .thenReturn(List.of(section("summary", "Summary", 0)));
+        when(profileLinkRepository.findAllByProfileIdOrderBySortOrderAsc(10L)).thenReturn(List.of());
+        when(profileSkillRepository.findAllByProfileIdOrderBySortOrderAsc(10L)).thenReturn(List.of());
+        when(profileExperienceRepository.findAllByProfileIdOrderBySortOrderAsc(10L)).thenReturn(List.of());
+        when(profileEducationRepository.findAllByProfileIdOrderBySortOrderAsc(10L)).thenReturn(List.of());
+        when(profileProjectRepository.findAllByProfileIdOrderBySortOrderAsc(10L)).thenReturn(List.of());
+
+        PublicProfileResponse response = profileService.getPublicProfile("john-dev");
+
+        assertThat(response.slug()).isEqualTo("john-dev");
+        assertThat(response.template().code()).isEqualTo("modern-stack");
+        assertThat(response.profile().sections()).hasSize(1);
+    }
+
+    @Test
+    void getPublicProfileRejectsUnpublishedProfiles() {
+        when(profileRepository.findBySlugIgnoreCaseAndPublicationStatus("john-dev", "PUBLISHED"))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> profileService.getPublicProfile("john-dev"))
+                .hasMessage("Published profile not found");
     }
 
     @Test
