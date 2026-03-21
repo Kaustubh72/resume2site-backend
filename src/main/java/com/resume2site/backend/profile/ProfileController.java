@@ -48,6 +48,29 @@ public class ProfileController {
         return new ApiResponse<>(profileService.updateSections(profileId, request, draftToken, authenticatedUser));
     }
 
+    @PostMapping("/{profileId}/publish")
+    public ApiResponse<PublishProfileResponse> publishProfile(@PathVariable Long profileId,
+                                                              @Valid @RequestBody PublishProfileRequest request,
+                                                              @RequestHeader(value = DRAFT_TOKEN_HEADER, required = false) String draftToken,
+                                                              @AuthenticationPrincipal AuthenticatedUser authenticatedUser) {
+        return new ApiResponse<>(profileService.publishProfile(profileId, request, draftToken, authenticatedUser));
+    }
+
+    @PostMapping("/{profileId}/republish")
+    public ApiResponse<PublishProfileResponse> republishProfile(@PathVariable Long profileId,
+                                                                @Valid @RequestBody PublishProfileRequest request,
+                                                                @RequestHeader(value = DRAFT_TOKEN_HEADER, required = false) String draftToken,
+                                                                @AuthenticationPrincipal AuthenticatedUser authenticatedUser) {
+        return new ApiResponse<>(profileService.republishProfile(profileId, request, draftToken, authenticatedUser));
+    }
+
+    @PutMapping("/{profileId}/slug")
+    public ApiResponse<PublishProfileResponse> updateSlug(@PathVariable Long profileId,
+                                                          @Valid @RequestBody UpdateProfileSlugRequest request,
+                                                          @AuthenticationPrincipal AuthenticatedUser authenticatedUser) {
+        return new ApiResponse<>(profileService.updateSlug(profileId, request, authenticatedUser));
+    }
+
     @PostMapping("/{profileId}/links")
     @ResponseStatus(HttpStatus.CREATED)
     public ApiResponse<ProfileLinkResponse> createLink(@PathVariable Long profileId,

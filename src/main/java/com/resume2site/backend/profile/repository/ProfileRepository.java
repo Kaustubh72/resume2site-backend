@@ -9,4 +9,5 @@ public interface ProfileRepository extends JpaRepository<Profile, Long> {
     Optional<Profile> findByResumeUploadId(Long resumeUploadId);
     Optional<Profile> findBySlugAndPublicationStatus(String slug, String publicationStatus);
     boolean existsBySlugIgnoreCase(String slug);
+    boolean existsBySlugIgnoreCaseAndIdNot(String slug, Long id);
 }
