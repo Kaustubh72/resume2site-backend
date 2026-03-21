@@ -1,0 +1,92 @@
+# Resume2Site Backend
+
+Spring Boot backend foundation for the Resume2Site MVP, a resume-first platform that converts uploaded resumes into editable portfolio profiles and publishes them under path-based public URLs.
+
+## What is included in this foundation
+- Spring Boot 3.3.x project with Java 21 and Maven.
+- Feature-oriented package structure for auth, resume, profile, template, common, config, and security.
+- PostgreSQL + JPA + Flyway setup from day one.
+- Initial MVP schema for users, resume uploads, profiles, nested profile sections, and templates.
+- JWT security skeleton with public/private route separation.
+- CORS, multipart upload limits, actuator health, and consistent API error handling.
+- Seed data for the 3 default portfolio templates.
+
+## Stack
+- Java 21
+- Spring Boot 3.x
+- PostgreSQL
+- Maven
+- Spring Data JPA / Hibernate
+- Flyway
+- Spring Security
+- JWT (jjwt)
+- Bean Validation
+- Apache Tika + PDFBox + Apache POI
+
+## Local setup
+
+### 1. Start PostgreSQL
+Create a database and user locally, for example:
+
+```sql
+CREATE DATABASE resume2site;
+CREATE USER resume2site WITH PASSWORD 'resume2site';
+GRANT ALL PRIVILEGES ON DATABASE resume2site TO resume2site;
+```
+
+### 2. Configure environment variables
+You can run with defaults for local development, or override them:
+
+```bash
+export DB_URL=jdbc:postgresql://localhost:5432/resume2site
+export DB_USERNAME=resume2site
+export DB_PASSWORD=resume2site
+export APP_JWT_SECRET=change-me-change-me-change-me-change-me-please
+export APP_CORS_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173
+```
+
+### 3. Run the application
+```bash
+./mvnw spring-boot:run
+```
+
+If Maven Wrapper is not present, use:
+
+```bash
+mvn spring-boot:run
+```
+
+### 4. Verify health
+```bash
+curl http://localhost:8080/api/health
+curl http://localhost:8080/actuator/health
+```
+
+## Current API surface in foundation
+- `GET /api/health`
+- `GET /api/templates`
+- `GET /api/auth/foundation-status`
+- `GET /api/resumes/foundation-status`
+- `GET /api/profiles/foundation-status`
+
+These placeholder endpoints exist only to prove wiring and should be replaced with real feature flows in upcoming steps.
+
+## MVP assumptions in this foundation
+- Profiles are dynamically rendered by the frontend from structured API data.
+- Anonymous draft support will be handled through `draft_token` in later steps.
+- Resume uploads are modeled now, but storage and parsing pipeline are intentionally deferred.
+- Publish/login flow will attach anonymous drafts to authenticated users later.
+
+## Recommended next step
+Implement the **Auth module** next:
+- signup
+- login
+- me
+- password hashing
+- JWT issuance and authenticated user context
+
+After auth, continue with:
+1. Resume upload + parsing pipeline
+2. Profile CRUD
+3. Slug + publish flow
+4. Public profile APIs
