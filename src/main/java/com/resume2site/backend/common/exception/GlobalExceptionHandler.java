@@ -1,6 +1,7 @@
 package com.resume2site.backend.common.exception;
 
 import com.resume2site.backend.common.api.ApiErrorResponse;
+import com.resume2site.backend.common.constants.ApiErrorMessages;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import java.time.Instant;
@@ -27,7 +28,7 @@ public class GlobalExceptionHandler {
                 .stream()
                 .map(this::toFieldError)
                 .toList();
-        return build(HttpStatus.BAD_REQUEST, "Validation failed", request, fieldErrors);
+        return build(HttpStatus.BAD_REQUEST, ApiErrorMessages.VALIDATION_FAILED, request, fieldErrors);
     }
 
     @ExceptionHandler(ConstraintViolationException.class)
@@ -37,7 +38,7 @@ public class GlobalExceptionHandler {
                 .stream()
                 .map(violation -> new ApiErrorResponse.ApiFieldError(violation.getPropertyPath().toString(), violation.getMessage()))
                 .toList();
-        return build(HttpStatus.BAD_REQUEST, "Validation failed", request, fieldErrors);
+        return build(HttpStatus.BAD_REQUEST, ApiErrorMessages.VALIDATION_FAILED, request, fieldErrors);
     }
 
     @ExceptionHandler({ResourceNotFoundException.class, MethodArgumentTypeMismatchException.class})
@@ -57,12 +58,12 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ApiErrorResponse> handleDataIntegrityViolation(DataIntegrityViolationException exception, HttpServletRequest request) {
-        String message = "Request could not be completed because it conflicts with existing data";
+        String message = ApiErrorMessages.DATA_CONFLICT;
         String lowerMessage = exception.getMostSpecificCause() == null ? "" : exception.getMostSpecificCause().getMessage().toLowerCase();
         if (lowerMessage.contains("slug")) {
-            message = "Slug is already taken";
+            message = ApiErrorMessages.SLUG_TAKEN;
         } else if (lowerMessage.contains("email")) {
-            message = "An account with this email already exists";
+            message = ApiErrorMessages.EMAIL_EXISTS;
         }
         return build(HttpStatus.CONFLICT, message, request, List.of());
     }
@@ -80,12 +81,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<ApiErrorResponse> handleUploadLimit(MaxUploadSizeExceededException exception,
                                                               HttpServletRequest request) {
-        return build(HttpStatus.PAYLOAD_TOO_LARGE, "Uploaded file exceeds configured limit", request, List.of());
+        return build(HttpStatus.PAYLOAD_TOO_LARGE, ApiErrorMessages.UPLOAD_LIMIT_EXCEEDED, request, List.of());
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiErrorResponse> handleGeneric(Exception exception, HttpServletRequest request) {
-        return build(HttpStatus.INTERNAL_SERVER_ERROR, "An unexpected error occurred", request, List.of());
+        return build(HttpStatus.INTERNAL_SERVER_ERROR, ApiErrorMessages.UNEXPECTED_ERROR, request, List.of());
     }
 
     private ApiErrorResponse.ApiFieldError toFieldError(FieldError fieldError) {

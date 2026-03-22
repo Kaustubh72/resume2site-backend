@@ -1,6 +1,7 @@
 package com.resume2site.backend.resume.service;
 
 import com.resume2site.backend.common.exception.ConflictException;
+import com.resume2site.backend.resume.ResumeConstants;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -16,7 +17,7 @@ public class ResumeTextExtractionService {
         try (InputStream inputStream = Files.newInputStream(filePath)) {
             return tika.parseToString(inputStream);
         } catch (Exception exception) {
-            throw new ConflictException("Unable to extract text from the uploaded resume");
+            throw new ConflictException(ResumeConstants.MESSAGE_EXTRACT_TEXT_FAILED);
         }
     }
 }

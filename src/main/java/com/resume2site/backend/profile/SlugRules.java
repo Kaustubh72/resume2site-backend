@@ -30,27 +30,27 @@ public final class SlugRules {
     public static ValidationResult validate(String value) {
         String slug = normalize(value);
         if (slug == null || slug.isBlank()) {
-            return new ValidationResult(false, "slug is required");
+            return new ValidationResult(false, SlugMessages.SLUG_REQUIRED);
         }
         if (!slug.equals(value.trim())) {
-            return new ValidationResult(false, "slug must use lowercase letters, numbers, and hyphens only");
+            return new ValidationResult(false, SlugMessages.SLUG_LOWERCASE_ONLY);
         }
         if (slug.length() < MIN_LENGTH || slug.length() > MAX_LENGTH) {
-            return new ValidationResult(false, "slug must be between 3 and 40 characters");
+            return new ValidationResult(false, SlugMessages.SLUG_LENGTH_INVALID);
         }
         if (!VALID_PATTERN.matcher(slug).matches()) {
-            return new ValidationResult(false, "slug must contain only lowercase letters, numbers, and hyphens");
+            return new ValidationResult(false, SlugMessages.SLUG_FORMAT_INVALID);
         }
         if (RESERVED_SLUGS.contains(slug)) {
-            return new ValidationResult(false, "slug is reserved");
+            return new ValidationResult(false, SlugMessages.SLUG_RESERVED);
         }
-        return new ValidationResult(true, "slug is valid");
+        return new ValidationResult(true, SlugMessages.SLUG_VALID);
     }
 
     public static String sanitizeBase(String value) {
         String normalized = normalize(value);
         if (normalized == null) {
-            return "site";
+            return SlugMessages.DEFAULT_SUGGESTION_BASE;
         }
         String ascii = Normalizer.normalize(normalized, Normalizer.Form.NFD)
                 .replaceAll("\\p{M}", "")
@@ -59,7 +59,7 @@ public final class SlugRules {
                 .replaceAll("^-+|-+$", "")
                 .replaceAll("-+", "-");
         if (ascii.isBlank()) {
-            return "site";
+            return SlugMessages.DEFAULT_SUGGESTION_BASE;
         }
         return trimToMax(ascii);
     }

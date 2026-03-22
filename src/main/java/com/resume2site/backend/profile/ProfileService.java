@@ -30,19 +30,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class ProfileService {
 
-    private static final List<DefaultSection> DEFAULT_SECTIONS = List.of(
-            new DefaultSection("summary", "Summary", 0),
-            new DefaultSection("links", "Links", 1),
-            new DefaultSection("skills", "Skills", 2),
-            new DefaultSection("experiences", "Experience", 3),
-            new DefaultSection("projects", "Projects", 4),
-            new DefaultSection("education", "Education", 5)
-    );
-
     private final ProfileRepository profileRepository;
-    private static final String STATUS_DRAFT = "DRAFT";
-    private static final String STATUS_PUBLISHED = "PUBLISHED";
-    private static final String PUBLIC_PROFILE_PATH_PREFIX = "/u/";
 
     private final TemplateRepository templateRepository;
     private final ProfileSectionRepository profileSectionRepository;
@@ -81,11 +69,11 @@ public class ProfileService {
     public PublicProfileResponse getPublicProfile(String slug) {
         String normalizedSlug = trimToNull(slug);
         if (normalizedSlug == null) {
-            throw new ResourceNotFoundException("Published profile not found");
+            throw new ResourceNotFoundException(ProfileConstants.MESSAGE_PUBLISHED_PROFILE_NOT_FOUND);
         }
 
-        Profile profile = profileRepository.findBySlugIgnoreCaseAndPublicationStatus(normalizedSlug, STATUS_PUBLISHED)
-                .orElseThrow(() -> new ResourceNotFoundException("Published profile not found"));
+        Profile profile = profileRepository.findBySlugIgnoreCaseAndPublicationStatus(normalizedSlug, ProfileConstants.STATUS_PUBLISHED)
+                .orElseThrow(() -> new ResourceNotFoundException(ProfileConstants.MESSAGE_PUBLISHED_PROFILE_NOT_FOUND));
 
         return new PublicProfileResponse(
                 profile.getSlug(),
@@ -141,7 +129,7 @@ public class ProfileService {
         if (request.templateId() != null) {
             template = templateRepository.findById(request.templateId())
                     .filter(Template::isActive)
-                    .orElseThrow(() -> new BadRequestException("Template not found or inactive"));
+                    .orElseThrow(() -> new BadRequestException(ProfileConstants.MESSAGE_TEMPLATE_NOT_FOUND_OR_INACTIVE));
         }
 
         profile.setFullName(trimToNull(request.fullName()));
@@ -173,7 +161,7 @@ public class ProfileService {
         for (UpdateProfileSectionsRequest.SectionItem item : request.sections()) {
             ProfileSection section = sectionsByKey.get(item.sectionKey().trim().toLowerCase(Locale.ROOT));
             if (section == null) {
-                throw new BadRequestException("Unsupported sectionKey: " + item.sectionKey());
+                throw new BadRequestException(ProfileConstants.MESSAGE_UNSUPPORTED_SECTION_KEY_PREFIX + item.sectionKey());
             }
             section.setDisplayName(item.displayName().trim());
             section.setVisible(item.visible());
@@ -198,7 +186,7 @@ public class ProfileService {
     @Transactional
     public ProfileLinkResponse updateLink(Long profileId, Long linkId, UpsertProfileLinkRequest request, String draftToken, AuthenticatedUser authenticatedUser) {
         loadAuthorizedProfile(profileId, draftToken, authenticatedUser);
-        ProfileLink link = requireOwned(profileLinkRepository.findById(linkId).orElseThrow(() -> new ResourceNotFoundException("Link not found")), profileId, "Link not found");
+        ProfileLink link = requireOwned(profileLinkRepository.findById(linkId).orElseThrow(() -> new ResourceNotFoundException(ProfileConstants.MESSAGE_LINK_NOT_FOUND)), profileId, ProfileConstants.MESSAGE_LINK_NOT_FOUND);
         applyLink(link, request);
         return toLinkResponse(profileLinkRepository.save(link));
     }
@@ -206,7 +194,7 @@ public class ProfileService {
     @Transactional
     public void deleteLink(Long profileId, Long linkId, String draftToken, AuthenticatedUser authenticatedUser) {
         loadAuthorizedProfile(profileId, draftToken, authenticatedUser);
-        ProfileLink link = requireOwned(profileLinkRepository.findById(linkId).orElseThrow(() -> new ResourceNotFoundException("Link not found")), profileId, "Link not found");
+        ProfileLink link = requireOwned(profileLinkRepository.findById(linkId).orElseThrow(() -> new ResourceNotFoundException(ProfileConstants.MESSAGE_LINK_NOT_FOUND)), profileId, ProfileConstants.MESSAGE_LINK_NOT_FOUND);
         profileLinkRepository.delete(link);
     }
 
@@ -222,7 +210,7 @@ public class ProfileService {
     @Transactional
     public ProfileSkillResponse updateSkill(Long profileId, Long skillId, UpsertProfileSkillRequest request, String draftToken, AuthenticatedUser authenticatedUser) {
         loadAuthorizedProfile(profileId, draftToken, authenticatedUser);
-        ProfileSkill skill = requireOwned(profileSkillRepository.findById(skillId).orElseThrow(() -> new ResourceNotFoundException("Skill not found")), profileId, "Skill not found");
+        ProfileSkill skill = requireOwned(profileSkillRepository.findById(skillId).orElseThrow(() -> new ResourceNotFoundException(ProfileConstants.MESSAGE_SKILL_NOT_FOUND)), profileId, ProfileConstants.MESSAGE_SKILL_NOT_FOUND);
         applySkill(skill, request);
         return toSkillResponse(profileSkillRepository.save(skill));
     }
@@ -230,7 +218,7 @@ public class ProfileService {
     @Transactional
     public void deleteSkill(Long profileId, Long skillId, String draftToken, AuthenticatedUser authenticatedUser) {
         loadAuthorizedProfile(profileId, draftToken, authenticatedUser);
-        ProfileSkill skill = requireOwned(profileSkillRepository.findById(skillId).orElseThrow(() -> new ResourceNotFoundException("Skill not found")), profileId, "Skill not found");
+        ProfileSkill skill = requireOwned(profileSkillRepository.findById(skillId).orElseThrow(() -> new ResourceNotFoundException(ProfileConstants.MESSAGE_SKILL_NOT_FOUND)), profileId, ProfileConstants.MESSAGE_SKILL_NOT_FOUND);
         profileSkillRepository.delete(skill);
     }
 
@@ -248,7 +236,7 @@ public class ProfileService {
     public ProfileExperienceResponse updateExperience(Long profileId, Long experienceId, UpsertProfileExperienceRequest request, String draftToken, AuthenticatedUser authenticatedUser) {
         validateExperienceDates(request.startDate(), request.endDate(), request.isCurrent());
         loadAuthorizedProfile(profileId, draftToken, authenticatedUser);
-        ProfileExperience experience = requireOwned(profileExperienceRepository.findById(experienceId).orElseThrow(() -> new ResourceNotFoundException("Experience not found")), profileId, "Experience not found");
+        ProfileExperience experience = requireOwned(profileExperienceRepository.findById(experienceId).orElseThrow(() -> new ResourceNotFoundException(ProfileConstants.MESSAGE_EXPERIENCE_NOT_FOUND)), profileId, ProfileConstants.MESSAGE_EXPERIENCE_NOT_FOUND);
         applyExperience(experience, request);
         return toExperienceResponse(profileExperienceRepository.save(experience));
     }
@@ -256,13 +244,13 @@ public class ProfileService {
     @Transactional
     public void deleteExperience(Long profileId, Long experienceId, String draftToken, AuthenticatedUser authenticatedUser) {
         loadAuthorizedProfile(profileId, draftToken, authenticatedUser);
-        ProfileExperience experience = requireOwned(profileExperienceRepository.findById(experienceId).orElseThrow(() -> new ResourceNotFoundException("Experience not found")), profileId, "Experience not found");
+        ProfileExperience experience = requireOwned(profileExperienceRepository.findById(experienceId).orElseThrow(() -> new ResourceNotFoundException(ProfileConstants.MESSAGE_EXPERIENCE_NOT_FOUND)), profileId, ProfileConstants.MESSAGE_EXPERIENCE_NOT_FOUND);
         profileExperienceRepository.delete(experience);
     }
 
     @Transactional
     public ProfileEducationResponse createEducation(Long profileId, UpsertProfileEducationRequest request, String draftToken, AuthenticatedUser authenticatedUser) {
-        validateChronologicalDates(request.startDate(), request.endDate(), "education");
+        validateChronologicalDates(request.startDate(), request.endDate(), ProfileConstants.SECTION_EDUCATION);
         Profile profile = loadAuthorizedProfile(profileId, draftToken, authenticatedUser);
         ProfileEducation education = new ProfileEducation();
         education.setProfile(profile);
@@ -272,9 +260,9 @@ public class ProfileService {
 
     @Transactional
     public ProfileEducationResponse updateEducation(Long profileId, Long educationId, UpsertProfileEducationRequest request, String draftToken, AuthenticatedUser authenticatedUser) {
-        validateChronologicalDates(request.startDate(), request.endDate(), "education");
+        validateChronologicalDates(request.startDate(), request.endDate(), ProfileConstants.SECTION_EDUCATION);
         loadAuthorizedProfile(profileId, draftToken, authenticatedUser);
-        ProfileEducation education = requireOwned(profileEducationRepository.findById(educationId).orElseThrow(() -> new ResourceNotFoundException("Education not found")), profileId, "Education not found");
+        ProfileEducation education = requireOwned(profileEducationRepository.findById(educationId).orElseThrow(() -> new ResourceNotFoundException(ProfileConstants.MESSAGE_EDUCATION_NOT_FOUND)), profileId, ProfileConstants.MESSAGE_EDUCATION_NOT_FOUND);
         applyEducation(education, request);
         return toEducationResponse(profileEducationRepository.save(education));
     }
@@ -282,7 +270,7 @@ public class ProfileService {
     @Transactional
     public void deleteEducation(Long profileId, Long educationId, String draftToken, AuthenticatedUser authenticatedUser) {
         loadAuthorizedProfile(profileId, draftToken, authenticatedUser);
-        ProfileEducation education = requireOwned(profileEducationRepository.findById(educationId).orElseThrow(() -> new ResourceNotFoundException("Education not found")), profileId, "Education not found");
+        ProfileEducation education = requireOwned(profileEducationRepository.findById(educationId).orElseThrow(() -> new ResourceNotFoundException(ProfileConstants.MESSAGE_EDUCATION_NOT_FOUND)), profileId, ProfileConstants.MESSAGE_EDUCATION_NOT_FOUND);
         profileEducationRepository.delete(education);
     }
 
@@ -298,7 +286,7 @@ public class ProfileService {
     @Transactional
     public ProfileProjectResponse updateProject(Long profileId, Long projectId, UpsertProfileProjectRequest request, String draftToken, AuthenticatedUser authenticatedUser) {
         loadAuthorizedProfile(profileId, draftToken, authenticatedUser);
-        ProfileProject project = requireOwned(profileProjectRepository.findById(projectId).orElseThrow(() -> new ResourceNotFoundException("Project not found")), profileId, "Project not found");
+        ProfileProject project = requireOwned(profileProjectRepository.findById(projectId).orElseThrow(() -> new ResourceNotFoundException(ProfileConstants.MESSAGE_PROJECT_NOT_FOUND)), profileId, ProfileConstants.MESSAGE_PROJECT_NOT_FOUND);
         applyProject(project, request);
         return toProjectResponse(profileProjectRepository.save(project));
     }
@@ -306,7 +294,7 @@ public class ProfileService {
     @Transactional
     public void deleteProject(Long profileId, Long projectId, String draftToken, AuthenticatedUser authenticatedUser) {
         loadAuthorizedProfile(profileId, draftToken, authenticatedUser);
-        ProfileProject project = requireOwned(profileProjectRepository.findById(projectId).orElseThrow(() -> new ResourceNotFoundException("Project not found")), profileId, "Project not found");
+        ProfileProject project = requireOwned(profileProjectRepository.findById(projectId).orElseThrow(() -> new ResourceNotFoundException(ProfileConstants.MESSAGE_PROJECT_NOT_FOUND)), profileId, ProfileConstants.MESSAGE_PROJECT_NOT_FOUND);
         profileProjectRepository.delete(project);
     }
 
@@ -334,8 +322,8 @@ public class ProfileService {
                                              UpdateProfileSlugRequest request,
                                              AuthenticatedUser authenticatedUser) {
         Profile profile = requireAuthenticatedOwnedProfile(profileId, null, authenticatedUser);
-        if (!STATUS_PUBLISHED.equalsIgnoreCase(profile.getPublicationStatus())) {
-            throw new BadRequestException("Profile must be published before updating slug");
+        if (!ProfileConstants.STATUS_PUBLISHED.equalsIgnoreCase(profile.getPublicationStatus())) {
+            throw new BadRequestException(ProfileConstants.MESSAGE_PROFILE_MUST_BE_PUBLISHED_BEFORE_SLUG_UPDATE);
         }
 
         String slug = slugService.requireUsableSlug(request.slug(), profile.getId());
@@ -351,7 +339,7 @@ public class ProfileService {
             return;
         }
         List<ProfileSection> sections = new ArrayList<>();
-        for (DefaultSection defaultSection : DEFAULT_SECTIONS) {
+        for (ProfileConstants.DefaultSectionDefinition defaultSection : ProfileConstants.DEFAULT_SECTIONS) {
             ProfileSection section = new ProfileSection();
             section.setProfile(profile);
             section.setSectionKey(defaultSection.sectionKey());
@@ -365,12 +353,12 @@ public class ProfileService {
 
     private PublishProfileResponse publish(Profile profile, String requestedSlug) {
         if (profile.getTemplate() == null) {
-            throw new BadRequestException("templateId is required before publishing");
+            throw new BadRequestException(ProfileConstants.MESSAGE_TEMPLATE_REQUIRED_BEFORE_PUBLISH);
         }
 
         String slug = slugService.requireUsableSlug(requestedSlug, profile.getId());
         profile.setSlug(slug);
-        profile.setPublicationStatus(STATUS_PUBLISHED);
+        profile.setPublicationStatus(ProfileConstants.STATUS_PUBLISHED);
         profile.setPublishedAt(Instant.now());
         Profile savedProfile = profileRepository.save(profile);
         return toPublishResponse(savedProfile);
@@ -378,16 +366,16 @@ public class ProfileService {
 
     private Profile requireAuthenticatedOwnedProfile(Long profileId, String draftToken, AuthenticatedUser authenticatedUser) {
         if (authenticatedUser == null) {
-            throw new UnauthorizedException("Authentication is required to publish this profile");
+            throw new UnauthorizedException(ProfileConstants.MESSAGE_AUTH_REQUIRED_TO_PUBLISH);
         }
         return loadAuthorizedProfile(profileId, draftToken, authenticatedUser);
     }
 
     private void attachProfileToAuthenticatedUser(Profile profile, AuthenticatedUser authenticatedUser) {
         User user = userRepository.findById(authenticatedUser.userId())
-                .orElseThrow(() -> new UnauthorizedException("Authenticated user not found"));
+                .orElseThrow(() -> new UnauthorizedException(ProfileConstants.MESSAGE_AUTHENTICATED_USER_NOT_FOUND));
         if (profile.getUser() != null && !Objects.equals(profile.getUser().getId(), user.getId())) {
-            throw new UnauthorizedException("You do not have access to this profile");
+            throw new UnauthorizedException(ProfileConstants.MESSAGE_PROFILE_ACCESS_DENIED);
         }
         if (profile.getResumeUpload() != null && profile.getResumeUpload().getUser() == null) {
             profile.getResumeUpload().setUser(user);
@@ -401,7 +389,7 @@ public class ProfileService {
                 profile.getSlug(),
                 profile.getPublicationStatus(),
                 profile.getTemplate() != null ? profile.getTemplate().getId() : null,
-                PUBLIC_PROFILE_PATH_PREFIX + profile.getSlug()
+                ProfileConstants.PUBLIC_PROFILE_PATH_PREFIX + profile.getSlug()
         );
     }
 
@@ -450,17 +438,17 @@ public class ProfileService {
 
     private Profile loadAuthorizedProfile(Long profileId, String draftToken, AuthenticatedUser authenticatedUser) {
         Profile profile = profileRepository.findById(profileId)
-                .orElseThrow(() -> new ResourceNotFoundException("Profile not found"));
+                .orElseThrow(() -> new ResourceNotFoundException(ProfileConstants.MESSAGE_PROFILE_NOT_FOUND));
 
         if (profile.getUser() != null) {
             if (authenticatedUser == null || !Objects.equals(profile.getUser().getId(), authenticatedUser.userId())) {
-                throw new UnauthorizedException("You do not have access to this profile");
+                throw new UnauthorizedException(ProfileConstants.MESSAGE_PROFILE_ACCESS_DENIED);
             }
             return profile;
         }
 
         if (draftToken == null || draftToken.isBlank() || !draftToken.equals(profile.getDraftToken())) {
-            throw new UnauthorizedException("A valid draft token is required to access this profile");
+            throw new UnauthorizedException(ProfileConstants.MESSAGE_DRAFT_TOKEN_REQUIRED);
         }
         return profile;
     }
@@ -471,26 +459,26 @@ public class ProfileService {
         for (UpdateProfileSectionsRequest.SectionItem section : sections) {
             String normalizedKey = section.sectionKey().trim().toLowerCase(Locale.ROOT);
             if (seenKeys.put(normalizedKey, 1) != null) {
-                throw new BadRequestException("Duplicate sectionKey is not allowed: " + normalizedKey);
+                throw new BadRequestException(ProfileConstants.MESSAGE_DUPLICATE_SECTION_KEY_PREFIX + normalizedKey);
             }
             if (seenSortOrders.put(section.sortOrder(), normalizedKey) != null) {
-                throw new BadRequestException("Duplicate sortOrder is not allowed: " + section.sortOrder());
+                throw new BadRequestException(ProfileConstants.MESSAGE_DUPLICATE_SORT_ORDER_PREFIX + section.sortOrder());
             }
         }
     }
 
     private void validateExperienceDates(java.time.LocalDate startDate, java.time.LocalDate endDate, Boolean isCurrent) {
         if (Boolean.TRUE.equals(isCurrent) && endDate != null) {
-            throw new BadRequestException("endDate must be null when isCurrent is true");
+            throw new BadRequestException(ProfileConstants.MESSAGE_END_DATE_MUST_BE_NULL_WHEN_CURRENT);
         }
         if (!Boolean.TRUE.equals(isCurrent)) {
-            validateChronologicalDates(startDate, endDate, "experience");
+            validateChronologicalDates(startDate, endDate, ProfileConstants.SECTION_EXPERIENCE);
         }
     }
 
     private void validateChronologicalDates(java.time.LocalDate startDate, java.time.LocalDate endDate, String section) {
         if (startDate != null && endDate != null && endDate.isBefore(startDate)) {
-            throw new BadRequestException("endDate must be on or after startDate for " + section);
+            throw new BadRequestException(ProfileConstants.MESSAGE_END_DATE_ORDER_PREFIX + section);
         }
     }
 
@@ -586,7 +574,7 @@ public class ProfileService {
         } else if (entity instanceof ProfileProject project) {
             ownerProfileId = project.getProfile().getId();
         } else {
-            throw new IllegalArgumentException("Unsupported profile child entity");
+            throw new IllegalArgumentException(ProfileConstants.MESSAGE_UNSUPPORTED_CHILD_ENTITY);
         }
         if (!Objects.equals(ownerProfileId, profileId)) {
             throw new ResourceNotFoundException(errorMessage);
@@ -594,6 +582,4 @@ public class ProfileService {
         return entity;
     }
 
-    private record DefaultSection(String sectionKey, String displayName, Integer sortOrder) {
-    }
 }

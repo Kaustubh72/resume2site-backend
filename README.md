@@ -216,3 +216,7 @@ Anonymous draft access uses the `X-Draft-Token` header until the profile is atta
   ]
 }
 ```
+
+
+## Frontend integration handoff
+Share `docs/frontend-api-integration.md` with the frontend agent for request/response shapes, auth expectations, draft-token handling, and publish/public-profile integration notes.

@@ -25,7 +25,7 @@ public class SlugService {
         }
 
         boolean available = !profileRepository.existsBySlugIgnoreCase(slug);
-        String message = available ? "Slug is available" : "Slug is already taken";
+        String message = available ? SlugMessages.SLUG_AVAILABLE : SlugMessages.SLUG_TAKEN;
         List<String> suggestions = available ? List.of() : suggestAlternatives(slug, null);
         return new SlugAvailabilityResponse(slug, true, available, message, suggestions);
     }
@@ -41,7 +41,7 @@ public class SlugService {
                 ? profileRepository.existsBySlugIgnoreCase(slug)
                 : profileRepository.existsBySlugIgnoreCaseAndIdNot(slug, currentProfileId);
         if (exists) {
-            throw new BadRequestException("Slug is already taken");
+            throw new BadRequestException(SlugMessages.SLUG_TAKEN);
         }
         return slug;
     }
@@ -53,7 +53,7 @@ public class SlugService {
     private List<String> suggestAlternatives(String slug, Long currentProfileId) {
         String base = SlugRules.sanitizeBase(slug);
         if (base.length() < SlugRules.MIN_LENGTH) {
-            base = (base + "site").substring(0, Math.min(SlugRules.MAX_LENGTH, Math.max(SlugRules.MIN_LENGTH, base.length() + 4)));
+            base = (base + SlugMessages.DEFAULT_SUGGESTION_BASE).substring(0, Math.min(SlugRules.MAX_LENGTH, Math.max(SlugRules.MIN_LENGTH, base.length() + SlugMessages.DEFAULT_SUGGESTION_BASE.length())));
         }
 
         Set<String> suggestions = new LinkedHashSet<>();
