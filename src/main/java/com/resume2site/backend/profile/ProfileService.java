@@ -137,9 +137,12 @@ public class ProfileService {
                                                String draftToken,
                                                AuthenticatedUser authenticatedUser) {
         Profile profile = loadAuthorizedProfile(profileId, draftToken, authenticatedUser);
-        Template template = templateRepository.findById(request.templateId())
-                .filter(Template::isActive)
-                .orElseThrow(() -> new BadRequestException("Template not found or inactive"));
+        Template template = null;
+        if (request.templateId() != null) {
+            template = templateRepository.findById(request.templateId())
+                    .filter(Template::isActive)
+                    .orElseThrow(() -> new BadRequestException("Template not found or inactive"));
+        }
 
         profile.setFullName(trimToNull(request.fullName()));
         profile.setHeadline(trimToNull(request.headline()));
@@ -381,11 +384,14 @@ public class ProfileService {
     }
 
     private void attachProfileToAuthenticatedUser(Profile profile, AuthenticatedUser authenticatedUser) {
-        if (profile.getUser() != null) {
-            return;
-        }
         User user = userRepository.findById(authenticatedUser.userId())
                 .orElseThrow(() -> new UnauthorizedException("Authenticated user not found"));
+        if (profile.getUser() != null && !Objects.equals(profile.getUser().getId(), user.getId())) {
+            throw new UnauthorizedException("You do not have access to this profile");
+        }
+        if (profile.getResumeUpload() != null && profile.getResumeUpload().getUser() == null) {
+            profile.getResumeUpload().setUser(user);
+        }
         profile.setUser(user);
     }
 

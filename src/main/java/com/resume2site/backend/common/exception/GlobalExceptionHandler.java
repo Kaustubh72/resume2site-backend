@@ -5,6 +5,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import java.time.Instant;
 import java.util.List;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -52,6 +53,18 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ConflictException.class)
     public ResponseEntity<ApiErrorResponse> handleConflict(ConflictException exception, HttpServletRequest request) {
         return build(HttpStatus.CONFLICT, exception.getMessage(), request, List.of());
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ApiErrorResponse> handleDataIntegrityViolation(DataIntegrityViolationException exception, HttpServletRequest request) {
+        String message = "Request could not be completed because it conflicts with existing data";
+        String lowerMessage = exception.getMostSpecificCause() == null ? "" : exception.getMostSpecificCause().getMessage().toLowerCase();
+        if (lowerMessage.contains("slug")) {
+            message = "Slug is already taken";
+        } else if (lowerMessage.contains("email")) {
+            message = "An account with this email already exists";
+        }
+        return build(HttpStatus.CONFLICT, message, request, List.of());
     }
 
     @ExceptionHandler({UnauthorizedException.class, org.springframework.security.core.AuthenticationException.class})

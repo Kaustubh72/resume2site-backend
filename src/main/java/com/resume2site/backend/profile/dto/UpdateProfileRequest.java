@@ -1,7 +1,7 @@
 package com.resume2site.backend.profile.dto;
 
 import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 
 public record UpdateProfileRequest(
@@ -18,7 +18,7 @@ public record UpdateProfileRequest(
         String phone,
         @Size(max = 255, message = "location must be at most 255 characters")
         String location,
-        @NotNull(message = "templateId is required")
+        @Positive(message = "templateId must be a positive number")
         Long templateId
 ) {
 }

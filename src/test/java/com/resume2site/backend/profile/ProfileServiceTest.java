@@ -66,7 +66,6 @@ class ProfileServiceTest {
         anonymousProfile.setPublicationStatus("DRAFT");
     }
 
-
     @Test
     void getPublicProfileReturnsOnlyPublishedProfiles() {
         Template template = new Template();
@@ -144,6 +143,27 @@ class ProfileServiceTest {
         assertThatThrownBy(() -> profileService.updateProfile(10L, request, "draft-token", new AuthenticatedUser(99L, "other@example.com")))
                 .isInstanceOf(UnauthorizedException.class)
                 .hasMessage("You do not have access to this profile");
+    }
+
+    @Test
+    void updateProfileAllowsSavingWithoutSelectingTemplateYet() {
+        when(profileRepository.findById(10L)).thenReturn(Optional.of(anonymousProfile));
+        when(profileSectionRepository.findAllByProfileIdOrderBySortOrderAsc(10L)).thenReturn(List.of(section("summary", "Summary", 0)));
+        when(profileRepository.save(any(Profile.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(profileLinkRepository.findAllByProfileIdOrderBySortOrderAsc(10L)).thenReturn(List.of());
+        when(profileSkillRepository.findAllByProfileIdOrderBySortOrderAsc(10L)).thenReturn(List.of());
+        when(profileExperienceRepository.findAllByProfileIdOrderBySortOrderAsc(10L)).thenReturn(List.of());
+        when(profileEducationRepository.findAllByProfileIdOrderBySortOrderAsc(10L)).thenReturn(List.of());
+        when(profileProjectRepository.findAllByProfileIdOrderBySortOrderAsc(10L)).thenReturn(List.of());
+
+        ProfileDetailResponse response = profileService.updateProfile(
+                10L,
+                new UpdateProfileRequest("Name", "Headline", "Summary", "user@example.com", null, null, null),
+                "draft-token",
+                null
+        );
+
+        assertThat(response.templateId()).isNull();
     }
 
     @Test
@@ -242,6 +262,16 @@ class ProfileServiceTest {
         assertThat(response.valid()).isTrue();
         assertThat(response.available()).isFalse();
         assertThat(response.suggestions()).contains("john-dev-site", "john-dev-portfolio");
+    }
+
+    @Test
+    void slugAvailabilityRejectsUppercaseInput() {
+        SlugService service = new SlugService(profileRepository);
+
+        SlugAvailabilityResponse response = service.checkAvailability("John-Dev");
+
+        assertThat(response.valid()).isFalse();
+        assertThat(response.message()).contains("lowercase");
     }
 
     private ProfileSection section(String key, String displayName, int sortOrder) {

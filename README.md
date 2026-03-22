@@ -1,32 +1,50 @@
 # Resume2Site Backend
 
-Spring Boot backend for the Resume2Site MVP, a resume-first platform that converts uploaded resumes into editable portfolio profiles and publishes them under path-based public URLs.
+Spring Boot backend for the Resume2Site MVP: a resume-first platform that turns an uploaded resume into an editable portfolio draft, lets the user preview before login, and publishes the profile under a path-based public URL such as `/u/{slug}`.
 
-## What is included right now
-- Spring Boot 3.3.x project with Java 21 and Maven.
-- Feature-oriented package structure for auth, resume, profile, template, common, config, and security.
-- PostgreSQL + JPA + Flyway setup.
-- Initial MVP schema for users, resume uploads, profiles, nested profile sections, and templates.
-- MVP auth module with email/password signup, login, `/me`, BCrypt password hashing, and JWT-based stateless security.
-- Resume upload + parsing pipeline for anonymous PDF/DOCX uploads.
-- Apache Tika based text extraction and a modular best-effort parser that builds draft profile records.
+## What the backend does
+- Accepts anonymous resume uploads for PDF and DOCX files.
+- Extracts and parses resume text into a structured draft profile.
+- Protects anonymous drafts with a high-entropy draft token.
+- Supports draft profile editing, nested section CRUD, template selection, slug checks, publish, and republish.
+- Supports email/password signup, login, and authenticated ownership after publish.
+- Exposes public-safe published profile data for frontend rendering.
+
+## Current MVP scope
+Included in this repository:
+- auth: signup, login, me
+- anonymous resume upload + parse
+- draft profile retrieval and editing
+- nested CRUD for links, skills, experiences, education, and projects
+- template listing and template detail
+- slug validation/checking
+- publish + republish
+- public profile retrieval by slug
+- Flyway migrations, validation, and consistent API error responses
+
+Explicitly out of scope for MVP:
+- custom domains or subdomains
+- static site generation/export
+- analytics or billing
+- admin tooling
+- AI rewriting features
+- microservices / queue-based redesigns
 
 ## Stack
-- Java 21
-- Spring Boot 3.x
-- PostgreSQL
+- Java 21+
+- Spring Boot 3.3.x
 - Maven
+- PostgreSQL
 - Spring Data JPA / Hibernate
 - Flyway
-- Spring Security
-- JWT (jjwt)
+- Spring Security + JWT
 - Bean Validation
 - Apache Tika + PDFBox + Apache POI
 
 ## Local setup
 
-### 1. Start PostgreSQL
-Create a database and user locally, for example:
+### 1. Create the database
+Example PostgreSQL bootstrap:
 
 ```sql
 CREATE DATABASE resume2site;
@@ -35,60 +53,122 @@ GRANT ALL PRIVILEGES ON DATABASE resume2site TO resume2site;
 ```
 
 ### 2. Configure environment variables
-You can run with defaults for local development, or override them:
+The app has local defaults, but these are the main overrides:
 
 ```bash
-export DB_URL=jdbc:postgresql://localhost:5432/resume2site
+export DB_URL=jdbc:postgresql://localhost:5432/resume2site?currentSchema=resume2siteschema
 export DB_USERNAME=resume2site
 export DB_PASSWORD=resume2site
 export APP_JWT_SECRET=change-me-change-me-change-me-change-me-please
+export APP_JWT_ISSUER=resume2site
+export APP_JWT_ACCESS_TTL_MINUTES=60
 export APP_CORS_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173
+export APP_UPLOAD_MAX_FILE_SIZE=10MB
+export APP_UPLOAD_MAX_REQUEST_SIZE=10MB
+export APP_UPLOAD_MAX_FILE_SIZE_BYTES=10485760
+export SERVER_PORT=8081
 ```
 
-### 3. Run the application
+### 3. Run the backend
 ```bash
+chmod +x mvnw
 ./mvnw spring-boot:run
 ```
 
-If Maven Wrapper is not present, use:
+If you already have Maven installed:
 
 ```bash
 mvn spring-boot:run
 ```
 
-### 4. Verify health
+### 4. Run migrations
+Flyway runs automatically on application startup.
+
+If you want an explicit migration-oriented startup check, run:
+
 ```bash
-curl http://localhost:8081/api/health
-curl http://localhost:8081/actuator/health
+./mvnw spring-boot:run
 ```
 
-## Current API surface
+### 5. Run tests
+```bash
+./mvnw test
+```
+
+If the Maven wrapper cannot download dependencies in your environment, use a preinstalled Maven with network access to your dependency mirror:
+
+```bash
+mvn test
+```
+
+## High-level API overview
+
+### Health
 - `GET /api/health`
+- `GET /actuator/health`
+
+### Auth
 - `POST /api/auth/signup`
 - `POST /api/auth/login`
 - `GET /api/auth/me`
-- `GET /api/templates`
-- `GET /api/templates/{templateId}`
-- `GET /api/public/{slug}`
+
+### Resume upload + parse
 - `POST /api/resumes/upload`
 - `POST /api/resumes/{resumeUploadId}/parse`
 
-## Resume upload + parsing flow
-The MVP keeps upload and parsing explicit:
-1. Anonymous user uploads a PDF or DOCX.
-2. Backend stores a temporary file and creates a `resume_uploads` record.
-3. Client calls parse using the returned upload id.
-4. Backend extracts text with Apache Tika, normalizes it, parses best-effort profile data, creates a draft `profiles` record, and stores child rows for links, skills, experience, education, and projects.
-5. Temporary source file is deleted after parse completes.
+### Templates
+- `GET /api/templates`
+- `GET /api/templates/{templateId}`
 
-### Upload example
-```bash
-curl -X POST http://localhost:8081/api/resumes/upload \
-  -H 'Accept: application/json' \
-  -F 'file=@/absolute/path/to/resume.pdf'
-```
+### Slugs
+- `GET /api/slugs/check?value={slug}`
 
-Example response:
+### Draft profile APIs
+Anonymous draft access uses the `X-Draft-Token` header until the profile is attached to a logged-in user.
+
+- `GET /api/profiles/{profileId}`
+- `PUT /api/profiles/{profileId}`
+- `PUT /api/profiles/{profileId}/sections`
+- `POST /api/profiles/{profileId}/links`
+- `PUT /api/profiles/{profileId}/links/{linkId}`
+- `DELETE /api/profiles/{profileId}/links/{linkId}`
+- `POST /api/profiles/{profileId}/skills`
+- `PUT /api/profiles/{profileId}/skills/{skillId}`
+- `DELETE /api/profiles/{profileId}/skills/{skillId}`
+- `POST /api/profiles/{profileId}/experiences`
+- `PUT /api/profiles/{profileId}/experiences/{experienceId}`
+- `DELETE /api/profiles/{profileId}/experiences/{experienceId}`
+- `POST /api/profiles/{profileId}/education`
+- `PUT /api/profiles/{profileId}/education/{educationId}`
+- `DELETE /api/profiles/{profileId}/education/{educationId}`
+- `POST /api/profiles/{profileId}/projects`
+- `PUT /api/profiles/{profileId}/projects/{projectId}`
+- `DELETE /api/profiles/{profileId}/projects/{projectId}`
+- `POST /api/profiles/{profileId}/publish`
+- `POST /api/profiles/{profileId}/republish`
+- `PUT /api/profiles/{profileId}/slug`
+
+### Public profile API
+- `GET /api/public/{slug}`
+
+## Resume upload flow
+1. Anonymous user uploads a PDF or DOCX file.
+2. Backend stores the file temporarily and creates a `resume_uploads` row.
+3. Client calls parse with the returned upload id.
+4. Backend extracts text, parses it best-effort, creates a draft profile, and returns the draft token.
+5. Temporary upload storage is deleted after parse completes or fails.
+6. When the user publishes while authenticated, the profile is attached to that user account.
+
+## Validation and safety notes
+- Uploads are server-side validated for presence, size, extension, and content type.
+- Slugs are centrally validated for lowercase format, length, reserved words, and uniqueness.
+- Publish requires an authenticated user and an active template selection.
+- Public profile responses intentionally exclude draft tokens, ownership metadata, and upload internals.
+- Error responses share one shape with timestamp, status, message, path, and optional field errors.
+
+## Example responses
+
+### Upload response
 ```json
 {
   "data": {
@@ -101,13 +181,7 @@ Example response:
 }
 ```
 
-### Parse example
-```bash
-curl -X POST http://localhost:8081/api/resumes/1/parse \
-  -H 'Accept: application/json'
-```
-
-Example response:
+### Parse response
 ```json
 {
   "data": {
@@ -115,7 +189,7 @@ Example response:
     "parseStatus": "PARSED",
     "profile": {
       "id": 10,
-      "draftToken": "6f7d8b24-3d2a-43cf-9b08-9f34d6d418cb",
+      "draftToken": "high-entropy-draft-token",
       "fullName": "Alice Johnson",
       "headline": null,
       "publicationStatus": "DRAFT",
@@ -126,114 +200,19 @@ Example response:
 }
 ```
 
-## Auth API examples
-
-### Signup
-```bash
-curl -X POST http://localhost:8081/api/auth/signup \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "email": "alice@example.com",
-    "password": "password123",
-    "fullName": "Alice Johnson"
-  }'
-```
-
-### Login
-```bash
-curl -X POST http://localhost:8081/api/auth/login \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "email": "alice@example.com",
-    "password": "password123"
-  }'
-```
-
-### Me
-```bash
-curl http://localhost:8081/api/auth/me \
-  -H 'Authorization: Bearer <access-token>'
-```
-
-
-## Public rendering flow
-The published portfolio flow for the MVP stays fully API-driven and frontend-rendered:
-1. Frontend fetches active templates from `GET /api/templates` and optionally `GET /api/templates/{templateId}` to show template cards before publish.
-2. Resume parsing and profile editing continue to produce one shared structured profile schema regardless of template choice.
-3. When a user publishes, the backend stores the chosen `templateId`, slug, and marks the profile as `PUBLISHED`.
-4. Public portfolio pages resolve by path-based slug routing such as `/u/{slug}` on the frontend app.
-5. The frontend calls `GET /api/public/{slug}` and receives only public-safe, published profile data plus the selected template metadata.
-6. The frontend selects the matching template component and renders the shared profile data dynamically. No HTML is rendered on the backend and no static site generation is used in the MVP.
-
-### Template response shape
-`GET /api/templates` returns only active templates intended for the picker UI, including lightweight metadata useful for previews.
-
-Example:
+### Standard error response
 ```json
 {
-  "data": [
+  "timestamp": "2026-03-22T10:15:30Z",
+  "status": 400,
+  "error": "Bad Request",
+  "message": "Validation failed",
+  "path": "/api/profiles/10/publish",
+  "fieldErrors": [
     {
-      "id": 1,
-      "code": "minimal-dev",
-      "name": "Minimal Developer",
-      "description": "Clean single-column template focused on early-career developers.",
-      "previewImageUrl": "https://cdn.resume2site.dev/templates/minimal-dev.png",
-      "category": "developer",
-      "accentColor": "#111827",
-      "features": ["Single-column layout", "Strong summary section", "Readable project blocks"],
-      "sortOrder": 1
+      "field": "slug",
+      "message": "slug must contain only lowercase letters, numbers, and hyphens"
     }
   ]
 }
 ```
-
-### Public profile response shape
-`GET /api/public/{slug}` only returns published, renderable data. Internal fields such as draft tokens, ownership information, resume upload references, and publication workflow details are intentionally excluded.
-
-Example:
-```json
-{
-  "data": {
-    "slug": "alice-johnson",
-    "publishedAt": "2026-03-21T10:15:30Z",
-    "template": {
-      "id": 2,
-      "code": "modern-stack",
-      "name": "Modern Stack"
-    },
-    "profile": {
-      "fullName": "Alice Johnson",
-      "headline": "Software Engineer",
-      "summary": "Backend-focused developer...",
-      "email": "alice@example.com",
-      "phone": "+1-555-0100",
-      "location": "Bengaluru, India",
-      "sections": [],
-      "links": [],
-      "skills": [],
-      "experiences": [],
-      "education": [],
-      "projects": []
-    }
-  }
-}
-```
-
-## Security behavior
-- `POST /api/auth/signup` and `POST /api/auth/login` are public.
-- `POST /api/resumes/upload` and `POST /api/resumes/{resumeUploadId}/parse` are public for the anonymous MVP preview flow.
-- `GET /api/auth/me` requires a valid JWT bearer token.
-- Template listing, slug checks, and public profile fetches remain public for the MVP flow.
-- Other ownership-sensitive endpoints are protected by default unless explicitly opened.
-
-## MVP assumptions in the current codebase
-- Profiles are dynamically rendered by the frontend from structured API data.
-- Resume parsing is intentionally heuristic and all parsed data is expected to be editable later.
-- Temporary uploaded files are deleted after parse and are not kept forever.
-- Publish/login flow will later attach anonymous drafts to authenticated users.
-
-## Recommended next step
-Implement **profile CRUD + draft editing APIs** next:
-- fetch anonymous draft by token
-- update parsed profile fields and nested sections
-- support template selection and live preview data retrieval

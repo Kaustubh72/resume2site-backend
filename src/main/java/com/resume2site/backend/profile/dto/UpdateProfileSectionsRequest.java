@@ -1,6 +1,7 @@
 package com.resume2site.backend.profile.dto;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -12,14 +13,15 @@ public record UpdateProfileSectionsRequest(
 ) {
     public record SectionItem(
             @NotNull(message = "sectionKey is required")
-            @Size(max = 100, message = "sectionKey must be at most 100 characters")
+            @Size(min = 1, max = 100, message = "sectionKey must be between 1 and 100 characters")
             String sectionKey,
             @NotNull(message = "displayName is required")
-            @Size(max = 100, message = "displayName must be at most 100 characters")
+            @Size(min = 1, max = 100, message = "displayName must be between 1 and 100 characters")
             String displayName,
             @NotNull(message = "visible is required")
             Boolean visible,
             @NotNull(message = "sortOrder is required")
+            @Min(value = 0, message = "sortOrder must be 0 or greater")
             Integer sortOrder
     ) {
     }

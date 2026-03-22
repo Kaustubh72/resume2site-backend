@@ -1,5 +1,6 @@
 package com.resume2site.backend.profile.dto;
 
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -21,6 +22,7 @@ public record UpsertProfileExperienceRequest(
         @Size(max = 5000, message = "description must be at most 5000 characters")
         String description,
         @NotNull(message = "sortOrder is required")
+        @Min(value = 0, message = "sortOrder must be 0 or greater")
         Integer sortOrder
 ) {
 }
