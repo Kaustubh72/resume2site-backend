@@ -1,0 +1,33 @@
+services:
+  - type: web
+    name: resume2site-backend
+    env: docker
+    plan: starter
+    dockerfilePath: Dockerfile
+    buildCommand: mvn -B clean package -DskipTests -DskipITs
+    startCommand: java -jar target/*.jar
+    envVars:
+      - key: SERVER_PORT
+        value: "8081"
+      - key: SERVER_CONTEXT_PATH
+        value: "/"
+      - key: APP_CORS_ALLOWED_ORIGINS
+        value: "http://localhost:3000,http://localhost:5173,http://localhost:4200"
+      - key: APP_JWT_SECRET
+        value: "change-me-change-me-change-me-change-me-please"
+      - key: APP_JWT_ISSUER
+        value: "resume2site"
+      - key: APP_JWT_ACCESS_TTL_MINUTES
+        value: "60"
+      - key: APP_UPLOAD_MAX_FILE_SIZE
+        value: "10MB"
+      - key: APP_UPLOAD_MAX_REQUEST_SIZE
+        value: "10MB"
+      - key: APP_UPLOAD_MAX_FILE_SIZE_BYTES
+        value: "10485760"
+      - key: DB_URL
+        value: "jdbc:postgresql://localhost:5432/resume2site?currentSchema=resume2siteschema"
+      - key: DB_USERNAME
+        value: "resume2site"
+      - key: DB_PASSWORD
+        value: "resume2site"
