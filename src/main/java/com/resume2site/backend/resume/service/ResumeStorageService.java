@@ -1,6 +1,7 @@
 package com.resume2site.backend.resume.service;
 
 import com.resume2site.backend.common.exception.BadRequestException;
+import com.resume2site.backend.resume.ResumeConstants;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -16,14 +17,14 @@ public class ResumeStorageService {
 
     public Path store(MultipartFile file, String extension) {
         try {
-            Path directory = Files.createTempDirectory("resume2site-upload-");
+            Path directory = Files.createTempDirectory(ResumeConstants.TEMP_DIRECTORY_PREFIX);
             Path target = directory.resolve(UUID.randomUUID() + "." + extension.toLowerCase(Locale.ROOT));
             try (InputStream inputStream = file.getInputStream()) {
                 Files.copy(inputStream, target, StandardCopyOption.REPLACE_EXISTING);
             }
             return target;
         } catch (IOException exception) {
-            throw new BadRequestException("Unable to store uploaded resume");
+            throw new BadRequestException(ResumeConstants.MESSAGE_STORE_UPLOAD_FAILED);
         }
     }
 

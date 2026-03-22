@@ -2,7 +2,9 @@ package com.resume2site.backend.resume.service;
 
 import com.resume2site.backend.common.exception.BadRequestException;
 import com.resume2site.backend.common.exception.ResourceNotFoundException;
+import com.resume2site.backend.resume.ResumeConstants;
 import com.resume2site.backend.config.UploadProperties;
+import com.resume2site.backend.profile.DraftTokenService;
 import com.resume2site.backend.profile.domain.Profile;
 import com.resume2site.backend.profile.domain.ProfileEducation;
 import com.resume2site.backend.profile.domain.ProfileExperience;
@@ -22,15 +24,17 @@ import com.resume2site.backend.resume.dto.ResumeUploadResponse;
 import com.resume2site.backend.resume.repository.ResumeUploadRepository;
 import com.resume2site.backend.resume.service.parser.ParsedProfileData;
 import com.resume2site.backend.resume.service.parser.ResumeProfileParser;
-import jakarta.transaction.Transactional;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Locale;
-import java.util.UUID;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 @Service
 public class ResumeService {
+
+    private static final List<String> FALLBACK_CONTENT_TYPES = ResumeConstants.FALLBACK_CONTENT_TYPES;
 
     private final UploadProperties uploadProperties;
     private final ResumeStorageService resumeStorageService;
@@ -43,6 +47,7 @@ public class ResumeService {
     private final ProfileExperienceRepository profileExperienceRepository;
     private final ProfileEducationRepository profileEducationRepository;
     private final ProfileProjectRepository profileProjectRepository;
+    private final DraftTokenService draftTokenService;
 
     public ResumeService(UploadProperties uploadProperties,
                          ResumeStorageService resumeStorageService,
@@ -54,7 +59,8 @@ public class ResumeService {
                          ProfileSkillRepository profileSkillRepository,
                          ProfileExperienceRepository profileExperienceRepository,
                          ProfileEducationRepository profileEducationRepository,
-                         ProfileProjectRepository profileProjectRepository) {
+                         ProfileProjectRepository profileProjectRepository,
+                         DraftTokenService draftTokenService) {
         this.uploadProperties = uploadProperties;
         this.resumeStorageService = resumeStorageService;
         this.textExtractionService = textExtractionService;
@@ -66,6 +72,7 @@ public class ResumeService {
         this.profileExperienceRepository = profileExperienceRepository;
         this.profileEducationRepository = profileEducationRepository;
         this.profileProjectRepository = profileProjectRepository;
+        this.draftTokenService = draftTokenService;
     }
 
     @Transactional
@@ -75,56 +82,81 @@ public class ResumeService {
         Path storedPath = resumeStorageService.store(file, extension);
 
         ResumeUpload upload = new ResumeUpload();
-        upload.setOriginalFileName(file.getOriginalFilename());
-        upload.setContentType(file.getContentType());
+        upload.setOriginalFileName(file.getOriginalFilename().trim());
+        upload.setContentType(normalizeContentType(file.getContentType()));
         upload.setFileSizeBytes(file.getSize());
         upload.setStoragePath(storedPath.toString());
-        upload.setParseStatus("UPLOADED");
+        upload.setParseStatus(ResumeConstants.STATUS_UPLOADED);
 
         ResumeUpload saved = resumeUploadRepository.save(upload);
         return new ResumeUploadResponse(saved.getId(), saved.getOriginalFileName(), saved.getContentType(), saved.getFileSizeBytes(), saved.getParseStatus());
     }
 
-    @Transactional
     public ResumeParseResponse parse(Long resumeUploadId) {
         ResumeUpload upload = resumeUploadRepository.findById(resumeUploadId)
-                .orElseThrow(() -> new ResourceNotFoundException("Resume upload not found"));
+                .orElseThrow(() -> new ResourceNotFoundException(ResumeConstants.MESSAGE_RESUME_UPLOAD_NOT_FOUND));
 
-        if ("PARSED".equalsIgnoreCase(upload.getParseStatus())) {
+        if (ResumeConstants.STATUS_PARSED.equalsIgnoreCase(upload.getParseStatus())) {
             Profile existingProfile = profileRepository.findByResumeUploadId(resumeUploadId)
-                    .orElseThrow(() -> new ResourceNotFoundException("Parsed profile not found for resume upload"));
+                    .orElseThrow(() -> new ResourceNotFoundException(ResumeConstants.MESSAGE_PARSED_PROFILE_NOT_FOUND));
             return new ResumeParseResponse(upload.getId(), upload.getParseStatus(), toProfileSummary(existingProfile));
         }
 
         Path filePath = Path.of(upload.getStoragePath());
+        markParseStatus(upload, ResumeConstants.STATUS_PARSING);
         try {
-            upload.setParseStatus("PARSING");
             String extractedText = textExtractionService.extract(filePath);
+            if (extractedText.isBlank()) {
+                throw new BadRequestException(ResumeConstants.MESSAGE_NO_READABLE_TEXT);
+            }
+
             upload.setExtractedText(extractedText);
-
-            ParsedProfileData parsedProfileData = profileParser.parse(extractedText);
-
-            Profile profile = new Profile();
-            profile.setResumeUpload(upload);
-            profile.setDraftToken(UUID.randomUUID().toString());
-            profile.setFullName(parsedProfileData.fullName());
-            profile.setEmail(parsedProfileData.email());
-            profile.setPhone(parsedProfileData.phone());
-            profile.setProfessionalSummary(parsedProfileData.professionalSummary());
-            profile.setPublicationStatus("DRAFT");
-            Profile savedProfile = profileRepository.save(profile);
-
-            saveChildRecords(savedProfile, parsedProfileData);
-
-            upload.setParseStatus("PARSED");
             resumeUploadRepository.save(upload);
+
+            ParsedProfileData parsedProfileData = parseSafely(extractedText);
+            Profile savedProfile = createDraftProfile(upload, parsedProfileData);
+            markParseStatus(upload, ResumeConstants.STATUS_PARSED);
             return new ResumeParseResponse(upload.getId(), upload.getParseStatus(), toProfileSummary(savedProfile));
         } catch (RuntimeException exception) {
-            upload.setParseStatus("FAILED");
+            markParseStatus(upload, ResumeConstants.STATUS_FAILED);
             throw exception;
         } finally {
             resumeStorageService.deleteIfExists(filePath);
         }
+    }
+
+    private ParsedProfileData parseSafely(String extractedText) {
+        try {
+            return profileParser.parse(extractedText);
+        } catch (RuntimeException exception) {
+            return new ParsedProfileData(null, null, null, null, List.of(), List.of(), List.of(), List.of(), List.of());
+        }
+    }
+
+    @Transactional
+    protected Profile createDraftProfile(ResumeUpload upload, ParsedProfileData parsedProfileData) {
+        Profile existingProfile = profileRepository.findByResumeUploadId(upload.getId()).orElse(null);
+        if (existingProfile != null) {
+            return existingProfile;
+        }
+
+        Profile profile = new Profile();
+        profile.setResumeUpload(upload);
+        profile.setDraftToken(draftTokenService.generate());
+        profile.setFullName(parsedProfileData.fullName());
+        profile.setEmail(parsedProfileData.email());
+        profile.setPhone(parsedProfileData.phone());
+        profile.setProfessionalSummary(parsedProfileData.professionalSummary());
+        profile.setPublicationStatus(ResumeConstants.PROFILE_STATUS_DRAFT);
+        Profile savedProfile = profileRepository.save(profile);
+
+        saveChildRecords(savedProfile, parsedProfileData);
+        return savedProfile;
+    }
+
+    private void markParseStatus(ResumeUpload upload, String status) {
+        upload.setParseStatus(status);
+        resumeUploadRepository.save(upload);
     }
 
     private void saveChildRecords(Profile profile, ParsedProfileData data) {
@@ -188,26 +220,38 @@ public class ResumeService {
 
     private void validateUpload(MultipartFile file) {
         if (file == null || file.isEmpty()) {
-            throw new BadRequestException("Resume file is required");
+            throw new BadRequestException(ResumeConstants.MESSAGE_RESUME_FILE_REQUIRED);
         }
         if (file.getSize() > uploadProperties.maxFileSizeBytes()) {
-            throw new BadRequestException("Resume file exceeds the allowed size limit");
+            throw new BadRequestException(ResumeConstants.MESSAGE_RESUME_SIZE_LIMIT);
         }
-        String extension = getExtension(file.getOriginalFilename());
+
+        String originalFilename = file.getOriginalFilename();
+        if (originalFilename == null || originalFilename.isBlank()) {
+            throw new BadRequestException(ResumeConstants.MESSAGE_RESUME_FILE_NAME_REQUIRED);
+        }
+
+        String extension = getExtension(originalFilename);
         if (!uploadProperties.allowedExtensions().contains(extension)) {
-            throw new BadRequestException("Only PDF and DOCX resume uploads are supported");
+            throw new BadRequestException(ResumeConstants.MESSAGE_ONLY_PDF_DOCX_SUPPORTED);
         }
-        String contentType = file.getContentType() == null ? "" : file.getContentType().toLowerCase(Locale.ROOT);
-        if (!uploadProperties.allowedContentTypes().contains(contentType)) {
-            throw new BadRequestException("Uploaded file type is not supported");
+
+        String contentType = normalizeContentType(file.getContentType());
+        if (!uploadProperties.allowedContentTypes().contains(contentType) && !FALLBACK_CONTENT_TYPES.contains(contentType)) {
+            throw new BadRequestException(ResumeConstants.MESSAGE_RESUME_FILE_TYPE_UNSUPPORTED);
         }
     }
 
+    private String normalizeContentType(String contentType) {
+        return contentType == null ? "" : contentType.trim().toLowerCase(Locale.ROOT);
+    }
+
     private String getExtension(String fileName) {
-        if (fileName == null || !fileName.contains(".")) {
-            throw new BadRequestException("Resume file must include a valid extension");
+        String trimmed = fileName == null ? null : fileName.trim();
+        if (trimmed == null || !trimmed.contains(".")) {
+            throw new BadRequestException(ResumeConstants.MESSAGE_RESUME_EXTENSION_REQUIRED);
         }
-        return fileName.substring(fileName.lastIndexOf('.') + 1).toLowerCase(Locale.ROOT);
+        return trimmed.substring(trimmed.lastIndexOf('.') + 1).toLowerCase(Locale.ROOT);
     }
 
     private ProfileSummaryResponse toProfileSummary(Profile profile) {

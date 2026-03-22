@@ -1,14 +1,24 @@
 package com.resume2site.backend.common.validation;
 
+import com.resume2site.backend.profile.SlugRules;
 import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;
 
 public class ValidSlugValidator implements ConstraintValidator<ValidSlug, String> {
 
-    private static final String PATTERN = "^[a-z0-9]+(?:-[a-z0-9]+)*$";
-
     @Override
     public boolean isValid(String value, ConstraintValidatorContext context) {
-        return value == null || value.matches(PATTERN);
+        if (value == null) {
+            return true;
+        }
+
+        SlugRules.ValidationResult validation = SlugRules.validate(value);
+        if (validation.valid()) {
+            return true;
+        }
+
+        context.disableDefaultConstraintViolation();
+        context.buildConstraintViolationWithTemplate(validation.message()).addConstraintViolation();
+        return false;
     }
 }
