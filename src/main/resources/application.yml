@@ -3,8 +3,8 @@ spring:
     name: resume2site-backend
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/resume2site?currentSchema=resume2siteschema}
-    username: ${DB_USERNAME:resume2site}
-    password: ${DB_PASSWORD:resume2site}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
   jpa:
     open-in-view: false
@@ -26,7 +26,10 @@ spring:
       max-request-size: ${APP_UPLOAD_MAX_REQUEST_SIZE:10MB}
   jackson:
     default-property-inclusion: non_null
-
+logging:
+  level:
+    org.hibernate.SQL: DEBUG
+    org.hibernate.orm.jdbc.bind: TRACE
 server:
   port: ${SERVER_PORT:8081}
   servlet:
